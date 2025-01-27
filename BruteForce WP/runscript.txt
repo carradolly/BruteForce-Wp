@@ -1,0 +1,1 @@
+python3 bruteforcewordpress.py --target_file targets.txt --threads 10 --timeout 15 --sleep 1

